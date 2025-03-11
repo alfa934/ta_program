@@ -23,16 +23,6 @@
 /* USER CODE BEGIN Includes */
 #include "control.h"
 #include "sampling.h"
-/*
- *
- *
- * HAHAHAHHAHAHAHAHAHAHAH
- *
- *
- *
- *
- *
- */
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -93,77 +83,19 @@ static void MX_TIM4_Init(void);
 /* USER CODE BEGIN 0 */
 
 /******************************************************************************
- * Global Variables
+ * Function Definitions
  *****************************************************************************/
-//--- Systems
-short int system_start = 0;
-short int system_reset = 0;
 
-//--- Pressure Sensor
-#define MS5837_I2C_ADDR 	0x76 << 1 	// MS5837 I2C address
-#define MS5837_RESET_CMD 	0x1E      	// Reset command
-#define MS5837_PROM_READ 	0xA0      	// PROM read base address
-#define MS5837_CONVERT_D1 	0x40     	// Convert D1 command (pressure)
-#define MS5837_CONVERT_D2 	0x50     	// Convert D2 command (temperature)
-#define MS5837_ADC_READ 	0x00       	// ADC read command
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim == &htim1)
+	{
 
-uint8_t current_command;
-uint16_t prom_coefficients[8]; // PROM coefficients from the sensor
-uint32_t D1, D2;               // Raw pressure and temperature values
-uint32_t conversion_start_time = 0;
-int conversion_in_progress = 0;
-float pressure;
 
-//--- PID
-float   kp;
-float   ki;
-float   kd;
-float 	proportional;
-float 	integral;
-float 	derivative;
-float 	error;
-float 	prev_error;
+	}
+}
 
-/******************************************************************************
- * Function Prototypes
- *****************************************************************************/
-//void initSubmersible();
-//
-//void MS5837_Reset(void);
-//void MS5837_ReadPROM(void);
-//void MS5837_StartConversion(uint8_t command);
-//void MS5837_ReadADC(void);
-//void MS5837_ProcessConversion(void);
-//float MS5837_CalculatePressure(void);
-//uint32_t HAL_GetTick(void);
-//
-//void initPID(float KP, float KI, float KD);
-//float updatePID(float setpoint, float feedback, float maximum_output);
-//
-//
-///******************************************************************************
-// * Function Definitions
-// *****************************************************************************/
-//
-//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-//{
-//	if(htim == &htim1)
-//	{
-//		cnt_ms++;
-//		if(cnt_ms == 1000)
-//		{
-//			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-//
-//			tx_cnt++;
-//			memcpy(trans+3, &tx_cnt, sizeof(int));
-//			HAL_UART_Transmit_DMA(&huart2, (uint8_t *) trans, sizeof(trans));
-//
-//			cnt_ms = 0;
-//		}
-//	}
-//}
-//
-//
+
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 //{
 //	if(huart == &huart2)
@@ -194,40 +126,11 @@ float 	prev_error;
 //		HAL_UART_Receive_DMA(&huart2, (uint8_t *)recv, sizeof(recv));
 //	}
 //}
-//
-//
 
 
-void writeMotor(int motor, int speed)
-{
-	int dir_a = (speed >= 0);
-	int dir_b = (speed < 0);
-	speed = abs(speed);
 
-	switch(motor)
-	{
-		case 1:
-		{
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, dir_a);
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, dir_b);
-			TIM2->CCR1 = speed;
-			break;
-		}
-		case 2:
-		{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, dir_a);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, dir_b);
-			TIM2->CCR2 = speed;
-			break;
-		}
-		default:
-		{
-			break;
-		}
 
-	}
 
-}
 
 #define LIMIT_SW1 HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1)
 #define LIMIT_SW2 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4);
