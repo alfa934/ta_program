@@ -23,6 +23,22 @@
 
 
 /******************************************************************************
+ * Structs
+ *****************************************************************************/
+//--- PID
+typedef struct
+{
+	float   kp;
+	float   ki;
+	float   kd;
+	float 	proportional;
+	float 	integral;
+	float 	derivative;
+	float 	error;
+	float 	prev_error;
+} pid_t ;
+
+/******************************************************************************
  * Variable Declarations
  *****************************************************************************/
 extern short int test_var;
@@ -35,20 +51,10 @@ extern uint32_t conversion_start_time;
 extern int conversion_in_progress;
 extern float pressure;
 
-//--- PID
-extern float   kp;
-extern float   ki;
-extern float   kd;
-extern float 	proportional;
-extern float 	integral;
-extern float 	derivative;
-extern float 	error;
-extern float 	prev_error;
-
 //--- Systems
 extern short int system_start;
 extern short int system_reset;
-
+extern short int control_state;
 /******************************************************************************
  * Function Prototypes
  *****************************************************************************/
@@ -66,5 +72,7 @@ void initPID(float KP, float KI, float KD);
 float updatePID(float setpoint, float feedback, float maximum_output);
 
 void writeMotor(int motor, int speed);
+
+void mainControl();
 
 #endif /* INC_CONTROL_H_ */
