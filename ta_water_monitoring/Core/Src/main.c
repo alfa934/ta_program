@@ -88,7 +88,7 @@ static void MX_TIM4_Init(void);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(htim == &htim1)
+	if(htim == &htim4) //--- general timer
 	{
 
 
@@ -192,7 +192,7 @@ int main(void)
 //  MS5837_Reset();
 //  MS5837_ReadPROM();
 //
-//  HAL_TIM_Base_Start_IT(&htim4);
+  HAL_TIM_Base_Start_IT(&htim4);
   /* USER CODE END 2 */
 
   /* Infinite loop */
