@@ -30,6 +30,10 @@ short int control_state = 0;
 //--- pid
 pid_t motor_pid = {0};
 pid_t position_pid = {0};
+short int encoder_cnt = 0;
+short int encoder_setpoint = 0;
+
+
 
 /******************************************************************************
  * Function Definitions
@@ -46,7 +50,9 @@ void initSubmersible()
 	}
 }
 
-
+/*
+ * Pressure Sensor
+ */
 void MS5837_Reset(void)
 {
     uint8_t cmd = MS5837_RESET_CMD;
@@ -117,7 +123,9 @@ float MS5837_CalculatePressure(void)
     return P / 10.0f; // Return pressure in mbar
 }
 
-
+/*
+ * PID Control
+ */
 void initPID(pid_t *uPID, float KP, float KI, float KD)
 {
 	uPID->kp = KP;
@@ -139,7 +147,7 @@ float updatePID(pid_t *uPID, float setpoint, float feedback, float maximum_outpu
 	uPID->derivative   = uPID->kd * (uPID->error - uPID->prev_error);
 	uPID->prev_error   = uPID->error;
 
-	if(uPID->integral >= maximum_output) 			{ uPID->integral =   maximum_output; }
+	if(uPID->integral >= maximum_output) 			{ uPID->integral =   maximum_output;  }
 	else if(uPID->integral < -(maximum_output)) 	{ uPID->integral = -(maximum_output); }
 
 	float output = (uPID->proportional) + (uPID->integral) + (uPID->derivative);
@@ -150,8 +158,20 @@ float updatePID(pid_t *uPID, float setpoint, float feedback, float maximum_outpu
 	return output;
 }
 
+void pidControl()
+{
+	encoder_cnt = TIM1->CCR1;
+	TIM1->CCR1;
 
-void writeMotor(int motor, int speed)
+	short int pwm_output = (short int)(updatePID(&motor_pid, encoder_setpoint, encoder_cnt, 300));
+
+	writeMotor(1, pwm_output);
+
+}
+
+
+
+void writeMotor(short int motor, short int speed)
 {
 	int dir_a = (speed >= 0);
 	int dir_b = (speed <  0);
@@ -181,19 +201,14 @@ void writeMotor(int motor, int speed)
 	}
 
 }
-
-
-void mainControl()
-{
-    if (!conversion_in_progress)
-    {
-        MS5837_StartConversion(MS5837_CONVERT_D1);
-    }
-
-    MS5837_ProcessConversion();
-
-    if (!conversion_in_progress && D1 != 0 && D2 != 0)
-    {
-        pressure = MS5837_CalculatePressure();
-    }
-}
+//if (!conversion_in_progress)
+//{
+//    MS5837_StartConversion(MS5837_CONVERT_D1);
+//}
+//
+//MS5837_ProcessConversion();
+//
+//if (!conversion_in_progress && D1 != 0 && D2 != 0)
+//{
+//    pressure = MS5837_CalculatePressure();
+//}
