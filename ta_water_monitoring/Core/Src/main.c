@@ -82,6 +82,8 @@ static void MX_TIM4_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+uint8_t pid_cnt = 0;
+
 /******************************************************************************
  * Function Definitions
  *****************************************************************************/
@@ -90,7 +92,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim == &htim4) //--- general timer
 	{
+		pid_cnt++;
 
+		if(pid_cnt == 10)
+		{
+			pidControl();
+
+			pid_cnt = 0;
+		}
 
 	}
 }
@@ -133,7 +142,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 #define LIMIT_SW1 HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1)
-#define LIMIT_SW2 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4);
+#define LIMIT_SW2 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4)
 short int lim_sw1_stat = 1;
 short int lim_sw2_stat = 1;
 short int state = 0;
@@ -187,6 +196,8 @@ int main(void)
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+
+  initPID(&motor_pid, 0, 0, 0);
 
 
 //  MS5837_Reset();
