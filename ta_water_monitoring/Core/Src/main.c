@@ -82,8 +82,21 @@ static void MX_TIM4_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-uint8_t pid_cnt = 0;
+int pid_cnt = 0;
+#define LIMIT_SW1 HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1)
+#define LIMIT_SW2 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4)
+short int lim_sw1_stat = 1;
+short int lim_sw2_stat = 1;
+short int state = 0;
+int real_cnt = 0;
+short int machine_state = 0;
 
+#define FULL_LENGTH_PULSE 36644
+#define HALF_LENGTH_PULSE (FULL_LENGTH_PULSE/2)
+#define QRTR_LENGTH_PULSE (FULL_LENGTH_PULSE/4)
+
+short int pwm_output = 0;
+float Kp = 0.25, Ki = 0, Kd = 0;
 /******************************************************************************
  * Function Definitions
  *****************************************************************************/
@@ -92,13 +105,69 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim == &htim4) //--- general timer
 	{
-		pid_cnt++;
 
-		if(pid_cnt == 10)
+		lim_sw1_stat = LIMIT_SW1;
+		lim_sw2_stat = LIMIT_SW2;
+
+		switch(machine_state)
 		{
-			pidControl();
+			case 0: //-- go down
+				writeMotor(1, 350);
 
-			pid_cnt = 0;
+				if(lim_sw1_stat == 0)
+				{
+					writeMotor(1, 0);
+					machine_state++;
+				}
+				break;
+
+			case 1: //--- hold position;
+				pid_cnt++;
+
+				if(pid_cnt >= 5000)
+				{
+					pid_cnt = 0;
+					TIM1 -> CNT = 0;
+					real_cnt = 0;
+					machine_state++;
+				}
+
+				break;
+
+			case 2:
+				encoder_setpoint = -1 * (HALF_LENGTH_PULSE);
+
+				encoder_cnt += -1 * (TIM1 -> CNT);
+				TIM1 -> CNT = 0;
+
+				pwm_output = (short int)(updatePID(&motor_pid, encoder_setpoint, encoder_cnt, 999));
+
+				writeMotor(1, pwm_output);
+
+
+//				writeMotor(1, -500); //--- go up
+//
+//				if(real_cnt >= HALF_LENGTH_PULSE)
+//				{
+//					writeMotor(1, 0);
+//					machine_state++;
+//				}
+//				if(lim_sw2_stat == 0)
+//				{
+//					writeMotor(1, 0);
+//					machine_state++;
+//				}
+				break;
+
+			case 3:
+				pid_cnt++;
+
+				if(pid_cnt >= 10000)
+				{
+					pid_cnt = 0;
+//					machine_state = 0;
+				}
+				break;
 		}
 
 	}
@@ -139,15 +208,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 
-
-
-#define LIMIT_SW1 HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1)
-#define LIMIT_SW2 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4)
-short int lim_sw1_stat = 1;
-short int lim_sw2_stat = 1;
-short int state = 0;
-short int encoder_cnt = 0;
-short int machine_state = 0;
 /* USER CODE END 0 */
 
 /**
@@ -197,7 +257,7 @@ int main(void)
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
-  initPID(&motor_pid, 0, 0, 0);
+  initPID(&motor_pid, Kp, Ki, Kd);
 
 
 //  MS5837_Reset();
@@ -210,9 +270,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  lim_sw1_stat = LIMIT_SW1;
-	  lim_sw2_stat = LIMIT_SW2;
-//	  encoder_cnt = TIM1 -> CNT;
+//	  lim_sw1_stat = LIMIT_SW1;
+//	  lim_sw2_stat = LIMIT_SW2;
+
 //
 //
 //	  if(lim_sw1_stat == 0)
@@ -234,15 +294,16 @@ int main(void)
 //	  {
 //		  writeMotor(1, -350);
 //	  }
-	  test_var = 0;
-	  HAL_Delay(500);
-	  test_var = 1;
-	  HAL_Delay(500);
+
+//	  test_var = 0;
+//	  HAL_Delay(500);
+//	  test_var = 1;
+//	  HAL_Delay(500);
 
 //	  switch(machine_state)
 //	  {
 //	  	  case 0: //-- go down
-//	  		  writeMotor(1, 250);
+//	  		  writeMotor(1, 200);
 //
 //	  		  if(lim_sw1_stat == 0)
 //	  		  {
@@ -253,12 +314,14 @@ int main(void)
 //
 //	  	  case 1: //--- hold position;
 //	  		  HAL_Delay(5000);
+//	  		  TIM1 -> CNT = 0;
 //	  		  machine_state++;
 //	  		  break;
 //
 //	  	  case 2:
-//	  		  writeMotor(1, -250); //--- go up
-//
+//	  		  writeMotor(1, -200); //--- go up
+//	  		  real_cnt += TIM1 -> CNT;
+//	  		  TIM1 -> CNT = 0;
 //	  		  if(lim_sw2_stat == 0)
 //	  		  {
 //	  			  writeMotor(1, 0);

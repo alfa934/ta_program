@@ -55,6 +55,11 @@ extern float pressure;
 extern short int system_start;
 extern short int system_reset;
 extern short int control_state;
+extern short int encoder_cnt;
+extern short int encoder_setpoint;
+
+extern pid_t motor_pid;
+extern pid_t position_pid;
 /******************************************************************************
  * Function Prototypes
  *****************************************************************************/
@@ -68,10 +73,10 @@ void MS5837_ProcessConversion(void);
 float MS5837_CalculatePressure(void);
 uint32_t HAL_GetTick(void);
 
-void initPID(float KP, float KI, float KD);
-float updatePID(float setpoint, float feedback, float maximum_output);
+void initPID(pid_t *uPID, float KP, float KI, float KD);
+float updatePID(pid_t *uPID, float setpoint, float feedback, float maximum_output);
 
-void writeMotor(int motor, int speed);
+void writeMotor(short int motor, short int speed);
 
 void pidControl();
 

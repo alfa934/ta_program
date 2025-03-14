@@ -161,7 +161,7 @@ float updatePID(pid_t *uPID, float setpoint, float feedback, float maximum_outpu
 void pidControl()
 {
 	encoder_cnt = TIM1->CCR1;
-	TIM1->CCR1;
+	TIM1->CCR1 = 0;
 
 	short int pwm_output = (short int)(updatePID(&motor_pid, encoder_setpoint, encoder_cnt, 300));
 
