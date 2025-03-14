@@ -73,6 +73,6 @@ float updatePID(float setpoint, float feedback, float maximum_output);
 
 void writeMotor(int motor, int speed);
 
-void mainControl();
+void pidControl();
 
 #endif /* INC_CONTROL_H_ */
