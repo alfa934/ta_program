@@ -38,6 +38,16 @@ typedef struct
 	float 	prev_error;
 } pid_t ;
 
+typedef struct
+{
+	GPIO_TypeDef *GPIO_A;
+	GPIO_TypeDef *GPIO_B;
+	uint16_t GPIO_PIN_A;
+	uint16_t GPIO_PIN_B;
+	TIM_HandleTypeDef *htimx;
+	uint32_t channel;
+} motor_t ;
+
 /******************************************************************************
  * Variable Declarations
  *****************************************************************************/
@@ -60,6 +70,8 @@ extern short int encoder_setpoint;
 
 extern pid_t motor_pid;
 extern pid_t position_pid;
+
+extern motor_t motor_1;
 /******************************************************************************
  * Function Prototypes
  *****************************************************************************/
@@ -76,6 +88,9 @@ uint32_t HAL_GetTick(void);
 void initPID(pid_t *uPID, float KP, float KI, float KD);
 float updatePID(pid_t *uPID, float setpoint, float feedback, float maximum_output);
 
+void initMotor(motor_t *uMotor, GPIO_TypeDef *GPIO_A, uint16_t GPIO_PIN_A,
+				GPIO_TypeDef *GPIO_B,  uint16_t GPIO_PIN_B, TIM_HandleTypeDef *htimx, uint32_t channel);
+void runMotor(motor_t *uMotor, short int speed);
 void writeMotor(short int motor, short int speed);
 
 void pidControl();

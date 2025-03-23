@@ -4,13 +4,20 @@
 
 #include <SPI.h>
 #include <SD.h>
+#include <Wire.h>
+#include <SFE_BMP180.h>
+#include <Adafruit_INA219.h>
+
+SFE_BMP180 pressure;
+Adafruit_INA219 ina219;
+
 
 /*
  * Global Variables
  */
 #define chipSelect 4
-#define LED_WRITE_PIN 13
-#define LED_CONNECT_SD 12
+#define LED_WRITE_PIN 5
+#define LED_CONNECT_SD 6
 
 File openFile;
 
@@ -33,23 +40,62 @@ File openFile;
 
 char sensor_data_rx[data_size];              //--- "ABC" not stored
 char sensor_data_tx[data_size + 3] = "ABC";  //--- "ABC" stored
-float sensor_data_f[data_num]
+float sensor_data_f[data_num];
 String sensor_data_str = "";
 
 unsigned long int timeNow = 0;
 unsigned long int timePrev = 0;
 
+#define ALTITUDE 1655.0 // Altitude of SparkFun's HQ in Boulder, CO. in meters
+enum State {
+  START_TEMPERATURE,
+  GET_TEMPERATURE,
+  START_PRESSURE,
+  GET_PRESSURE,
+  IDLE_STATE
+};
+State currentState = START_TEMPERATURE;
+unsigned long previousMillis = 0;
+unsigned long prevTime = 0;
+unsigned long waitTime = 0;
+double T, P, p0, a;
+float temp_BMP180, press_BMP180;
+float shuntvoltage = 0;
+float busvoltage = 0;
+float current_mA = 0;
+float loadvoltage = 0;
+float power_mW = 0;
+
+
+
 void setup()
 {
     Serial.begin(115200);
     pinMode(SS, OUTPUT);
+
+    pinMode(LED_CONNECT_SD, OUTPUT);
+    pinMode(LED_WRITE_PIN, OUTPUT);
+
+    if (!pressure.begin()) 
+    {
+        while (1);
+    }
+    
+    if (! ina219.begin())
+    {
+        while (1);
+    }
    
     if (!SD.begin(chipSelect))
     {
-        //--- LED OFF    
+        //--- LED OFF
+        digitalWrite(LED_CONNECT_SD, LOW);    
         return;
     }
     //--- LED ON
+    digitalWrite(LED_CONNECT_SD, HIGH);
+
+    delay(3000);
 
 }
 
@@ -76,6 +122,8 @@ void loop()
         }
     }
 
+    readBMP180();
+    readINA219();
     
 }
 
@@ -144,7 +192,7 @@ void writeToFile()
     
     if(openFile)
     {
-        //--- LED ON
+        digitalWrite(LED_WRITE_PIN, HIGH);
         sensor_data_str = "";
         
         for(int i = 0; i < data_num; i++)
@@ -157,11 +205,34 @@ void writeToFile()
         
         openFile.close();
     }
-    else
-    {
-        //--- LED OFF
-    }
+    
+    digitalWrite(LED_WRITE_PIN, LOW);
 }
+
+//void writeToFile()
+//{
+//    openFile = SD.open("log.txt", FILE_WRITE);
+//    
+//    if(openFile)
+//    {
+//        digitalWrite(LED_WRITE_PIN, HIGH);
+//        sensor_data_str = "";
+//        
+//
+//        sensor_data_str += String(temp_BMP180);
+//        sensor_data_str += ";";
+//        sensor_data_str += String(press_BMP180);
+//        sensor_data_str += ";";
+//        sensor_data_str += String(shuntvoltage);
+//        sensor_data_str += ";";
+//        
+//        openFile.println(sensor_data_str);
+//        
+//        openFile.close();
+//    }
+//    
+//    digitalWrite(LED_WRITE_PIN, LOW);
+//}
 
 void transmitFile()
 {
@@ -169,7 +240,7 @@ void transmitFile()
 
     if(openFile)
     {
-        //--- LED ON
+        digitalWrite(LED_WRITE_PIN, HIGH);
         while(openFile.available())
         {
             timeNow = millis();
@@ -186,8 +257,103 @@ void transmitFile()
         }
         openFile.close();
     }
-    else
+    
+    digitalWrite(LED_WRITE_PIN, LOW);
+}
+
+void readBMP180()
+{
+    unsigned long currentMillis = millis();
+    char status;
+    
+    switch (currentState)
     {
-        //--- LED OFF
+        case START_TEMPERATURE:
+            status = pressure.startTemperature();
+            if (status != 0)
+            {
+                waitTime = status;
+                previousMillis = currentMillis;
+                currentState = GET_TEMPERATURE;
+            }
+            else
+            {
+                currentState = IDLE_STATE;
+            }
+            break;
+        
+        case GET_TEMPERATURE:
+            if (currentMillis - previousMillis >= waitTime)
+            {
+                status = pressure.getTemperature(T);
+                if (status != 0)
+                {
+                    temp_BMP180 = (float)T;
+                    currentState = START_PRESSURE;
+                }
+                else
+                {
+                    currentState = IDLE_STATE;
+                }
+            }
+            break;
+        
+        case START_PRESSURE:
+            status = pressure.startPressure(3);
+            if (status != 0)
+            {
+                waitTime = status;
+                previousMillis = currentMillis;
+                currentState = GET_PRESSURE;
+            }
+            else
+            {
+                currentState = IDLE_STATE;
+            }
+            break;
+        
+        case GET_PRESSURE:
+            if (currentMillis - previousMillis >= waitTime)
+            {
+                status = pressure.getPressure(P, T);
+                if (status != 0)
+                {
+                    press_BMP180 = P;
+                    p0 = pressure.sealevel(P, ALTITUDE);
+                    a = pressure.altitude(P, p0);
+                    
+                    currentState = IDLE_STATE;
+                }
+                else
+                {
+                    currentState = IDLE_STATE;
+                }
+            }
+            
+            break;
+        
+        case IDLE_STATE:
+            if (currentMillis - previousMillis >= 5000)
+            {
+                currentState = START_TEMPERATURE;
+            }
+            break;
+    }
+}
+
+
+void readINA219()
+{
+    unsigned long currentMillis = millis();
+
+    if(currentMillis - prevTime >= 2000)
+    {
+        prevTime = currentMillis;
+        
+        shuntvoltage = ina219.getShuntVoltage_mV();
+        busvoltage = ina219.getBusVoltage_V();
+        current_mA = ina219.getCurrent_mA();
+        power_mW = ina219.getPower_mW();
+        loadvoltage = busvoltage + (shuntvoltage / 1000);
     }
 }

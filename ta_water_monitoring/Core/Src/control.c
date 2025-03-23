@@ -169,7 +169,44 @@ void pidControl()
 
 }
 
+void initMotor(motor_t *uMotor, GPIO_TypeDef *GPIO_A, uint16_t GPIO_PIN_A,
+				GPIO_TypeDef *GPIO_B,  uint16_t GPIO_PIN_B, TIM_HandleTypeDef *htimx, uint32_t channel)
+{
+	uMotor->GPIO_A = GPIO_A;
+	uMotor->GPIO_PIN_A = GPIO_PIN_A;
+	uMotor->GPIO_B = GPIO_B;
+	uMotor->GPIO_PIN_B = GPIO_PIN_B;
+	uMotor->htimx = htimx;
+	uMotor->channel = channel;
+}
 
+void runMotor(motor_t *uMotor, short int speed)
+{
+	short int dir_a = (speed >= 0);
+	short int dir_b = (speed <  0);
+	speed = abs(speed);
+
+	HAL_GPIO_WritePin(uMotor->GPIO_A, uMotor->GPIO_PIN_A, dir_a);
+	HAL_GPIO_WritePin(uMotor->GPIO_B, uMotor->GPIO_PIN_B, dir_b);
+
+	switch (uMotor->channel)
+	{
+		case TIM_CHANNEL_1:
+			uMotor->htimx->Instance->CCR1 = speed;
+			break;
+		case TIM_CHANNEL_2:
+			uMotor->htimx->Instance->CCR2 = speed;
+			break;
+		case TIM_CHANNEL_3:
+			uMotor->htimx->Instance->CCR3 = speed;
+			break;
+		case TIM_CHANNEL_4:
+			uMotor->htimx->Instance->CCR4 = speed;
+			break;
+		default:
+			break;
+		}
+}
 
 void writeMotor(short int motor, short int speed)
 {

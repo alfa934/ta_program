@@ -96,7 +96,7 @@ short int machine_state = 0;
 #define QRTR_LENGTH_PULSE (FULL_LENGTH_PULSE/4)
 
 short int pwm_output = 0;
-float Kp = 0.25, Ki = 0, Kd = 0;
+float Kp = 1, Ki = 0, Kd = 0;
 /******************************************************************************
  * Function Definitions
  *****************************************************************************/
@@ -263,15 +263,15 @@ int main(void)
 //  MS5837_Reset();
 //  MS5837_ReadPROM();
 //
-  HAL_TIM_Base_Start_IT(&htim4);
+//  HAL_TIM_Base_Start_IT(&htim4);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  lim_sw1_stat = LIMIT_SW1;
-//	  lim_sw2_stat = LIMIT_SW2;
+	  lim_sw1_stat = LIMIT_SW1;
+	  lim_sw2_stat = LIMIT_SW2;
 
 //
 //
@@ -300,40 +300,43 @@ int main(void)
 //	  test_var = 1;
 //	  HAL_Delay(500);
 
-//	  switch(machine_state)
-//	  {
-//	  	  case 0: //-- go down
-//	  		  writeMotor(1, 200);
-//
-//	  		  if(lim_sw1_stat == 0)
-//	  		  {
-//	  			  writeMotor(1, 0);
-//	  			  machine_state++;
-//	  		  }
-//	  		  break;
-//
-//	  	  case 1: //--- hold position;
-//	  		  HAL_Delay(5000);
-//	  		  TIM1 -> CNT = 0;
-//	  		  machine_state++;
-//	  		  break;
-//
-//	  	  case 2:
-//	  		  writeMotor(1, -200); //--- go up
-//	  		  real_cnt += TIM1 -> CNT;
-//	  		  TIM1 -> CNT = 0;
-//	  		  if(lim_sw2_stat == 0)
-//	  		  {
-//	  			  writeMotor(1, 0);
-//	  			  machine_state++;
-//	  		  }
-//	  		  break;
-//
-//	  	  case 3:
-//	  		  HAL_Delay(10000);
-//	  		  machine_state = 0;
-//	  		  break;
-//	  }
+	  switch(machine_state)
+	  {
+	  	  case 0: //-- go down
+	  		  writeMotor(1, 250);
+	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, 1);
+	  		  if(lim_sw1_stat == 0)
+	  		  {
+	  			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, 0);
+	  			  writeMotor(1, 0);
+	  			  machine_state++;
+	  		  }
+	  		  break;
+
+	  	  case 1: //--- hold position;
+	  		  HAL_Delay(5000);
+	  		  TIM1 -> CNT = 0;
+	  		  machine_state++;
+	  		  break;
+
+	  	  case 2:
+	  		  writeMotor(1, -250); //--- go up
+	  		  real_cnt += TIM1 -> CNT;
+	  		  TIM1 -> CNT = 0;
+
+
+	  		  if(lim_sw2_stat == 0)
+	  		  {
+	  			  writeMotor(1, 0);
+	  			  machine_state++;
+	  		  }
+	  		  break;
+
+	  	  case 3:
+	  		  HAL_Delay(10000);
+	  		  machine_state = 0;
+	  		  break;
+	  }
 
 
 
@@ -785,10 +788,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14|GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -809,8 +812,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB14 PB15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_PIN_15;
+  /*Configure GPIO pins : PB14 PB4 PB5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_14|GPIO_PIN_4|GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -821,13 +831,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PB4 PB5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

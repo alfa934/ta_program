@@ -8,4 +8,6 @@
 ../Core/Src/control.c:129:6:initPID	1
 ../Core/Src/control.c:141:7:updatePID	5
 ../Core/Src/control.c:161:6:pidControl	1
-../Core/Src/control.c:174:6:writeMotor	3
+../Core/Src/control.c:172:6:initMotor	1
+../Core/Src/control.c:183:6:runMotor	5
+../Core/Src/control.c:211:6:writeMotor	3
