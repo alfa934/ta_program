@@ -9,17 +9,18 @@
 #define INC_CONTROL_H_
 
 #include "main.h"
+#include "MS5837_lib.h"
 
 /******************************************************************************
  * Defines
  *****************************************************************************/
-//--- Pressure Sensor
-#define MS5837_I2C_ADDR 	0x76 << 1 	// MS5837 I2C address
-#define MS5837_RESET_CMD 	0x1E      	// Reset command
-#define MS5837_PROM_READ 	0xA0      	// PROM read base address
-#define MS5837_CONVERT_D1 	0x40     	// Convert D1 command (pressure)
-#define MS5837_CONVERT_D2 	0x50     	// Convert D2 command (temperature)
-#define MS5837_ADC_READ 	0x00       	// ADC read command
+#define LIMIT_SW1 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1)
+#define LIMIT_SW2 HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5)
+
+#define FULL_LENGTH_PULSE 30985
+#define HALF_LENGTH_PULSE (FULL_LENGTH_PULSE/2)
+#define QRTR_LENGTH_PULSE (FULL_LENGTH_PULSE/4)
+
 
 
 /******************************************************************************
@@ -34,8 +35,11 @@ typedef struct
 	float 	proportional;
 	float 	integral;
 	float 	derivative;
+	float 	setpoint;
+	float	feedback;
 	float 	error;
 	float 	prev_error;
+	float	output;
 } pid_t ;
 
 typedef struct
@@ -48,51 +52,60 @@ typedef struct
 	uint32_t channel;
 } motor_t ;
 
+typedef struct
+{
+	short int start;
+	short int reset;
+	short int state;
+} system_t ;
+
 /******************************************************************************
  * Variable Declarations
  *****************************************************************************/
-extern short int test_var;
+extern short int lim_sw1_stat;
+extern short int lim_sw2_stat;
 
 //--- Pressure Sensor
-extern uint8_t current_command;
-extern uint16_t prom_coefficients[8]; // PROM coefficients from the sensor
-extern uint32_t D1, D2;               // Raw pressure and temperature values
-extern uint32_t conversion_start_time;
-extern int conversion_in_progress;
-extern float pressure;
+extern MS5837_t MS5837;
+
+//--- PID
+extern short int enc_cnt;
+extern long int total_enc_cnt;
+extern pid_t motor_pid;
+extern pid_t pressure_pid;
 
 //--- Systems
-extern short int system_start;
-extern short int system_reset;
-extern short int control_state;
-extern short int encoder_cnt;
-extern short int encoder_setpoint;
+extern system_t pressure_task;
+extern system_t test_task;
+extern system_t pid_task;
+extern system_t main_task;
+extern system_t my_task;
+extern system_t light_task;
 
-extern pid_t motor_pid;
-extern pid_t position_pid;
+extern int16_t pwm_output;
 
-extern motor_t motor_1;
+extern uint8_t adaptive_start;
+extern int32_t depth_setpoint;
+extern int32_t duration_min;
+
+extern char UART1_RX_BUFFER[12];
 /******************************************************************************
  * Function Prototypes
  *****************************************************************************/
-void initSubmersible();
+void 	initSubmersible();
 
-void MS5837_Reset(void);
-void MS5837_ReadPROM(void);
-void MS5837_StartConversion(uint8_t command);
-void MS5837_ReadADC(void);
-void MS5837_ProcessConversion(void);
-float MS5837_CalculatePressure(void);
-uint32_t HAL_GetTick(void);
+void 	PID_Init(pid_t *uPID, float KP, float KI, float KD);
+float 	PID_Update(pid_t *uPID, float setpoint, float feedback, float maximum_output);
 
-void initPID(pid_t *uPID, float KP, float KI, float KD);
-float updatePID(pid_t *uPID, float setpoint, float feedback, float maximum_output);
-
-void initMotor(motor_t *uMotor, GPIO_TypeDef *GPIO_A, uint16_t GPIO_PIN_A,
+void 	Motor_Init(motor_t *uMotor, GPIO_TypeDef *GPIO_A, uint16_t GPIO_PIN_A,
 				GPIO_TypeDef *GPIO_B,  uint16_t GPIO_PIN_B, TIM_HandleTypeDef *htimx, uint32_t channel);
-void runMotor(motor_t *uMotor, short int speed);
-void writeMotor(short int motor, short int speed);
+void 	Motor_Run(motor_t *uMotor, short int speed);
+void 	Motor_Write(short int motor, short int speed);
 
-void pidControl();
-
+int 	Task_Init(system_t *task);
+void 	Task_Pressure();
+void 	Task_Control_Test_UpDown();
+void 	Task_Control_PID();
+void 	light_sequence();
+void 	my_my_task();
 #endif /* INC_CONTROL_H_ */

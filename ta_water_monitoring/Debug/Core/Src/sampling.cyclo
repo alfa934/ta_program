@@ -1,0 +1,10 @@
+../Core/Src/sampling.c:74:6:Set_Pin_Output	1
+../Core/Src/sampling.c:83:6:Set_Pin_Input	1
+../Core/Src/sampling.c:92:6:delay	2
+../Core/Src/sampling.c:98:9:DS18B20_Start	2
+../Core/Src/sampling.c:115:6:DS18B20_Write	3
+../Core/Src/sampling.c:138:9:DS18B20_Read	3
+../Core/Src/sampling.c:157:7:calculateDO	3
+../Core/Src/sampling.c:177:6:initSampler	1
+../Core/Src/sampling.c:191:7:updateSamplingInterval	6
+../Core/Src/sampling.c:237:6:globalTimerProcess	4

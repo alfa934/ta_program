@@ -1,3 +1,4 @@
+"./Core/Src/MS5837_lib.o"
 "./Core/Src/control.o"
 "./Core/Src/main.o"
 "./Core/Src/sampling.o"

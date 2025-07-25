@@ -5,81 +5,78 @@
 #include <SPI.h>
 #include <SD.h>
 #include <Wire.h>
-#include <SFE_BMP180.h>
 #include <Adafruit_INA219.h>
 
-SFE_BMP180 pressure;
 Adafruit_INA219 ina219;
-
 
 /*
  * Global Variables
  */
 #define chipSelect 4
-#define LED_WRITE_PIN 5
-#define LED_CONNECT_SD 6
 
 File openFile;
 
+typedef struct
+{
+    uint16_t hour_t;
+    uint8_t  minute_t;
+    uint8_t  second_t;
+    uint16_t millisecond_t;
+} Time_t;
+
 /* Data for sensors
- * 0) Write data status
- * 1) timestamp
- * 2) pressure_water
- * 3) pH
- * 4) temperature_water
- * 5) diss. oxygen
- * 6) turbidity
- * 7) current
- * 8) voltage system
- * 9) voltage motor
- * 10) temperature_inside
- * 11) pressure_inside
+ * 00) timestamp hour
+ * 01) timestamp minute
+ * 02) timestamp seconds
+ * 03) timestamp milliseconds
+ * 04) pH status
+ * 05) pH
+ * 06) pH interval
+ * 07) temperature water status
+ * 08) temperature water
+ * 09) temperature interval
+ * 10) diss. oxygen status
+ * 11) diss. oxygen
+ * 12) diss. oxygen interval
+ * 13) turbidity status
+ * 14) turbidity
+ * 15) turbidity interval
+ * 16) send_state
+ * 17) current system
+ * 18) voltage system
+ * 
  */
-#define data_num    12
-#define data_size   (data_num * 4) //--- X data * 4 bytes 
 
-char sensor_data_rx[data_size];              //--- "ABC" not stored
-char sensor_data_tx[data_size + 3] = "ABC";  //--- "ABC" stored
-float sensor_data_f[data_num];
-String sensor_data_str = "";
+char sensor_data_rx[50];     //--- not including ABC
+char sensor_data_tx[55] = "ABC";
 
-unsigned long int timeNow = 0;
-unsigned long int timePrev = 0;
-
-#define ALTITUDE 1655.0 // Altitude of SparkFun's HQ in Boulder, CO. in meters
-enum State {
-  START_TEMPERATURE,
-  GET_TEMPERATURE,
-  START_PRESSURE,
-  GET_PRESSURE,
-  IDLE_STATE
-};
-State currentState = START_TEMPERATURE;
-unsigned long previousMillis = 0;
+unsigned long int timeNow    = 0;
+unsigned long int timePrev   = 0;
+unsigned long int sensorNow  = 0;
+unsigned long int sensorPrev = 0;
 unsigned long prevTime = 0;
-unsigned long waitTime = 0;
-double T, P, p0, a;
-float temp_BMP180, press_BMP180;
+
 float shuntvoltage = 0;
 float busvoltage = 0;
 float current_mA = 0;
 float loadvoltage = 0;
 float power_mW = 0;
+long int ina_interval = 2000;
 
+Time_t Global_Time;
+
+uint8_t save_ph = 0, save_temp = 0, save_do = 0, save_turb = 0, send_to_user = 0;
+
+float value_ph = 0, value_temp = 0, value_do = 0, value_turb = 0;
+
+float interval_ph = 0, interval_temp = 0, interval_do = 0, interval_turb = 0;
 
 
 void setup()
 {
     Serial.begin(115200);
     pinMode(SS, OUTPUT);
-
-    pinMode(LED_CONNECT_SD, OUTPUT);
-    pinMode(LED_WRITE_PIN, OUTPUT);
-
-    if (!pressure.begin()) 
-    {
-        while (1);
-    }
+    pinMode(13, OUTPUT);
     
     if (! ina219.begin())
     {
@@ -88,46 +85,79 @@ void setup()
    
     if (!SD.begin(chipSelect))
     {
-        //--- LED OFF
-        digitalWrite(LED_CONNECT_SD, LOW);    
         return;
     }
-    //--- LED ON
-    digitalWrite(LED_CONNECT_SD, HIGH);
 
-    delay(3000);
-
+    while(!(current_mA && loadvoltage))
+    {
+        readINA219();
+    }
+    delay(500);
+    writeFiles();
 }
+
+unsigned long int test = 0;
+uint8_t save_state = 0;
+unsigned long int save_time = 0;
+unsigned long int ina_time = 0;
+uint8_t send_finished = 0;
 
 void loop() 
 {
-    receiveData();
-
-    switch((int)(sensor_data_f[0]))
+    if(millis() - ina_time >= ina_interval)
     {
-        case 1:
+        ina_time = millis();
+        readINA219();
+    }
+    
+
+    if(millis() - prevTime >= 25)
+    {
+        prevTime += 25;
+        receiveData();
+    }
+    
+
+    if(Global_Time.second_t % 2 == 0)
+    {
+        digitalWrite(13, HIGH);
+    }
+    else
+    {
+        digitalWrite(13, LOW);
+    }
+
+    if(!send_finished)
+    {
+        if(!send_to_user)
         {
-            writeToFile();
-            break;
+            switch(save_state)
+            {
+                case 0:
+                    if(save_ph || save_temp || save_do || save_turb)
+                    {
+                        writeFiles();
+                        save_state++;
+                    }
+                    break;
+                case 1:
+                    if(millis() - save_time >= 3)
+                    {
+                        save_time = millis();
+                        save_state = 0;
+                        memset(sensor_data_rx, 0, sizeof(sensor_data_rx));
+                    }
+                    break;
+            }
+    
         }
-        case 2:
+        else
         {
             transmitFile();
-            break;
-        }
-        default:
-        {
-            //--- do nothing
-            break;
         }
     }
 
-    readBMP180();
-    readINA219();
-    
 }
-
-
 
 void receiveData()
 {
@@ -139,9 +169,9 @@ void receiveData()
 
         if(header_status == 0)
         {
-            if(Serial.available() >= sizeof(sensor_data_rx))
+            if(Serial.available() >= sizeof(sensor_data_rx) + 3)
             { 
-                for(int i = 0; i < sizeof(sensor_data_rx); i++)
+                for(int i = 0; i < sizeof(sensor_data_rx) + 3; i++)
                 { 
                     temp = Serial.read();
 
@@ -174,11 +204,29 @@ void receiveData()
                 }
 
                 memcpy(&sensor_data_rx, real_data, sizeof(sensor_data_rx));
+                
+                memcpy(&Global_Time.hour_t, sensor_data_rx, 2);
+                memcpy(&Global_Time.minute_t, sensor_data_rx + 2, 1);
+                memcpy(&Global_Time.second_t, sensor_data_rx + 3, 1);
+                memcpy(&Global_Time.millisecond_t, sensor_data_rx + 4, 2);
 
-                for(int i = 0; i < data_num; i++)
-                {
-                    memcpy(sensor_data_f + i, sensor_data_rx + (i * sizeof(float)), sizeof(float));
-                }
+                memcpy(&save_ph, sensor_data_rx + 6, 1);
+                memcpy(&value_ph, sensor_data_rx + 7, 4);
+                memcpy(&interval_ph, sensor_data_rx + 11, 4);
+
+                memcpy(&save_temp, sensor_data_rx + 15, 1);
+                memcpy(&value_temp, sensor_data_rx + 16, 4);
+                memcpy(&interval_temp, sensor_data_rx + 20, 4);
+
+                memcpy(&save_do, sensor_data_rx + 24, 1);
+                memcpy(&value_do, sensor_data_rx + 25, 4);
+                memcpy(&interval_do, sensor_data_rx + 29, 4);
+
+                memcpy(&save_turb, sensor_data_rx + 33, 1);
+                memcpy(&value_turb, sensor_data_rx + 34, 4);
+                memcpy(&interval_turb, sensor_data_rx + 38, 4);
+
+                memcpy(&send_to_user, sensor_data_rx + 42, 1);
                 
                 header_status = 0;
             }
@@ -186,174 +234,203 @@ void receiveData()
     }
 }
 
-void writeToFile()
+void writeFiles()
 {
-    openFile = SD.open("log.txt", FILE_WRITE);
+    String sensor_data_str;
     
+    openFile = SD.open("stfu.txt", FILE_WRITE);
+
     if(openFile)
-    {
-        digitalWrite(LED_WRITE_PIN, HIGH);
-        sensor_data_str = "";
+    {   
+        sensor_data_str  = "";
         
-        for(int i = 0; i < data_num; i++)
-        {
-            sensor_data_str += String(sensor_data_f[i]);
-            sensor_data_str += ";";
-        }
+        sensor_data_str += String(Global_Time.hour_t); //--- hour
+        sensor_data_str += ":";
+        sensor_data_str += String(Global_Time.minute_t); //--- minute
+        sensor_data_str += ":";
+        sensor_data_str += String(Global_Time.second_t); //--- second
+        sensor_data_str += ":";
+        sensor_data_str += String(Global_Time.millisecond_t); //--- millisecond
         
+        sensor_data_str += ";";
+        sensor_data_str += String(save_ph);
+        sensor_data_str += ";";
+        sensor_data_str += String(value_ph);
+        sensor_data_str += ";";
+        sensor_data_str += String(interval_ph);
+
+        sensor_data_str += ";";
+        sensor_data_str += String(save_temp);
+        sensor_data_str += ";";
+        sensor_data_str += String(value_temp);
+        sensor_data_str += ";";
+        sensor_data_str += String(interval_temp);
+        
+        sensor_data_str += ";";
+        sensor_data_str += String(save_do);
+        sensor_data_str += ";";
+        sensor_data_str += String(value_do);
+        sensor_data_str += ";";
+        sensor_data_str += String(interval_do);
+        
+        sensor_data_str += ";";
+        sensor_data_str += String(save_turb);
+        sensor_data_str += ";";
+        sensor_data_str += String(value_turb);
+        sensor_data_str += ";";
+        sensor_data_str += String(interval_turb);
+        
+        sensor_data_str += ";";
+        sensor_data_str += String(current_mA);
+        sensor_data_str += ";";
+        sensor_data_str += String(loadvoltage);
+        
+      
         openFile.println(sensor_data_str);
         
         openFile.close();
     }
-    
-    digitalWrite(LED_WRITE_PIN, LOW);
 }
-
-//void writeToFile()
-//{
-//    openFile = SD.open("log.txt", FILE_WRITE);
-//    
-//    if(openFile)
-//    {
-//        digitalWrite(LED_WRITE_PIN, HIGH);
-//        sensor_data_str = "";
-//        
-//
-//        sensor_data_str += String(temp_BMP180);
-//        sensor_data_str += ";";
-//        sensor_data_str += String(press_BMP180);
-//        sensor_data_str += ";";
-//        sensor_data_str += String(shuntvoltage);
-//        sensor_data_str += ";";
-//        
-//        openFile.println(sensor_data_str);
-//        
-//        openFile.close();
-//    }
-//    
-//    digitalWrite(LED_WRITE_PIN, LOW);
-//}
 
 void transmitFile()
 {
-    openFile = SD.open("log.txt");
-
-    if(openFile)
+  openFile = SD.open("STFU.txt");
+  if (openFile)
+  {
+    
+    int lineNumber = 0;
+    
+    // Read until end of file
+    //-- openFile.available()
+    while (openFile.available())
     {
-        digitalWrite(LED_WRITE_PIN, HIGH);
-        while(openFile.available())
+      lineNumber++;
+      int dataIndex = 0;
+      String token = "";
+      bool lineComplete = false;
+      
+      // Read a single line
+      while (openFile.available() && !lineComplete) 
+      {
+        char c = openFile.read();
+        
+        // Check for newline (end of line)
+        if (c == '\n')
         {
-            timeNow = millis();
-
-            if(timeNow - timePrev >= 250)
-            {
-                timePrev = timeNow;
-
-                
-            }
-            /*
-             * Read the file and send the data line by line (periodically)
-             */
+          lineComplete = true;
         }
-        openFile.close();
-    }
-    
-    digitalWrite(LED_WRITE_PIN, LOW);
-}
+        
+        // Process data when separator found or at end of line
+        if (c == ':' || c == ';' || lineComplete)
+        {
+          if (token.length() > 0)
+          {
+            storeData(dataIndex, token);
+            dataIndex++;
+            token = ""; // Reset token
+          }
+          if (lineComplete) break;
+        } 
+        // Skip carriage returns
+        else if (c != '\r')
+        {
+          token += c; // Build current token
+        }
+      }
+      
+      // Process line if we got all 18 data points
+      if (dataIndex == 18)
+      {
+        memcpy(sensor_data_tx +  3, &Global_Time.hour_t, 2);
+        memcpy(sensor_data_tx +  5, &Global_Time.minute_t, 1);
+        memcpy(sensor_data_tx +  6, &Global_Time.second_t, 1);
+        memcpy(sensor_data_tx +  7, &Global_Time.millisecond_t, 2);
 
-void readBMP180()
-{
-    unsigned long currentMillis = millis();
-    char status;
-    
-    switch (currentState)
-    {
-        case START_TEMPERATURE:
-            status = pressure.startTemperature();
-            if (status != 0)
-            {
-                waitTime = status;
-                previousMillis = currentMillis;
-                currentState = GET_TEMPERATURE;
-            }
-            else
-            {
-                currentState = IDLE_STATE;
-            }
-            break;
-        
-        case GET_TEMPERATURE:
-            if (currentMillis - previousMillis >= waitTime)
-            {
-                status = pressure.getTemperature(T);
-                if (status != 0)
-                {
-                    temp_BMP180 = (float)T;
-                    currentState = START_PRESSURE;
-                }
-                else
-                {
-                    currentState = IDLE_STATE;
-                }
-            }
-            break;
-        
-        case START_PRESSURE:
-            status = pressure.startPressure(3);
-            if (status != 0)
-            {
-                waitTime = status;
-                previousMillis = currentMillis;
-                currentState = GET_PRESSURE;
-            }
-            else
-            {
-                currentState = IDLE_STATE;
-            }
-            break;
-        
-        case GET_PRESSURE:
-            if (currentMillis - previousMillis >= waitTime)
-            {
-                status = pressure.getPressure(P, T);
-                if (status != 0)
-                {
-                    press_BMP180 = P;
-                    p0 = pressure.sealevel(P, ALTITUDE);
-                    a = pressure.altitude(P, p0);
-                    
-                    currentState = IDLE_STATE;
-                }
-                else
-                {
-                    currentState = IDLE_STATE;
-                }
-            }
+        memcpy(sensor_data_tx +  9, &save_ph, 1);
+        memcpy(sensor_data_tx + 10, &value_ph, 4);
+        memcpy(sensor_data_tx + 14, &interval_ph, 4);
+
+        memcpy(sensor_data_tx + 18, &save_temp, 1);
+        memcpy(sensor_data_tx + 19, &value_temp, 4);
+        memcpy(sensor_data_tx + 23, &interval_temp, 4);
+
+        memcpy(sensor_data_tx + 27, &save_do, 1);
+        memcpy(sensor_data_tx + 28, &value_do, 4);
+        memcpy(sensor_data_tx + 32, &interval_do, 4);
+
+        memcpy(sensor_data_tx + 36, &save_turb, 1);
+        memcpy(sensor_data_tx + 37, &value_turb, 4);
+        memcpy(sensor_data_tx + 41, &interval_turb, 4);
+
+        memcpy(sensor_data_tx + 45, &current_mA, 4);
+        memcpy(sensor_data_tx + 49, &loadvoltage, 4);
+
+        for(int i = 0; i < sizeof(sensor_data_tx); i++)
+        {
+            Serial.write(sensor_data_tx[i]);
+        }
+        delay(5);
             
-            break;
-        
-        case IDLE_STATE:
-            if (currentMillis - previousMillis >= 5000)
-            {
-                currentState = START_TEMPERATURE;
-            }
-            break;
+      } 
+      else if (token.length() > 0)
+      {
+        storeData(dataIndex, token);  // Process last token
+      }
     }
+    
+    openFile.close();
+    
+    send_finished = 1;
+    
+    memcpy(sensor_data_tx + 53, &send_finished, 1);
+
+    for(int i = 0; i < 20; i++)
+    {
+        for(int i = 0; i < sizeof(sensor_data_tx); i++)
+        {
+            Serial.write(sensor_data_tx[i]);
+        }
+        delay(5);
+    }
+  }
+
 }
 
+void storeData(int index, String token) {
+  switch(index) {
+    case 0: Global_Time.hour_t = token.toInt(); break;
+    case 1: Global_Time.minute_t = token.toInt(); break;
+    case 2: Global_Time.second_t = token.toInt(); break;
+    case 3: Global_Time.millisecond_t = token.toInt(); break;
+    case 4: save_ph = token.toInt(); break;
+    case 5: value_ph = token.toFloat(); break;
+    case 6: interval_ph = token.toFloat(); break;
+    case 7: save_temp = token.toInt(); break;
+    case 8: value_temp = token.toFloat(); break;
+    case 9: interval_temp = token.toFloat(); break;
+    case 10: save_do = token.toInt(); break;
+    case 11: value_do = token.toFloat(); break;
+    case 12: interval_do = token.toFloat(); break;
+    case 13: save_turb = token.toInt(); break;
+    case 14: value_turb = token.toFloat(); break;
+    case 15: interval_turb = token.toFloat(); break;
+    case 16: current_mA = token.toFloat(); break;
+    case 17: loadvoltage = token.toFloat(); break;
+  }
+}
 
 void readINA219()
 {
-    unsigned long currentMillis = millis();
-
-    if(currentMillis - prevTime >= 2000)
-    {
-        prevTime = currentMillis;
+//    unsigned long currentMillis = millis();
+//
+//    if(currentMillis - ina_time >= ina_interval)
+//    {
+//        ina_time = currentMillis;
         
         shuntvoltage = ina219.getShuntVoltage_mV();
         busvoltage = ina219.getBusVoltage_V();
         current_mA = ina219.getCurrent_mA();
         power_mW = ina219.getPower_mW();
         loadvoltage = busvoltage + (shuntvoltage / 1000);
-    }
+//    }
 }

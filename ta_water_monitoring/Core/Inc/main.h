@@ -40,11 +40,12 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 extern ADC_HandleTypeDef hadc1;
-
+extern ADC_HandleTypeDef hadc2;
 extern I2C_HandleTypeDef hi2c1;
 
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 
 extern UART_HandleTypeDef huart1;
@@ -56,6 +57,7 @@ extern DMA_HandleTypeDef hdma_usart2_rx;
 extern DMA_HandleTypeDef hdma_usart2_tx;
 extern DMA_HandleTypeDef hdma_usart3_rx;
 extern DMA_HandleTypeDef hdma_usart3_tx;
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
