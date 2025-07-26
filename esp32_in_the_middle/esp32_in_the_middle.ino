@@ -172,13 +172,21 @@ void handleWiFiConnection()
 void handleServer()
 {
     if (wifiState != CONNECTED) return;
-    
+
+    if (currentClient && !currentClient.connected())
+    {
+        currentClient.stop();
+        send_to_user = 0;  // Reset the send flag
+        sd_card_finished = 0;
+        currentClient = WiFiClient();  // Clear client instance
+    }
     
     if (!currentClient)
     {
         currentClient = server.available();
         if (currentClient)
         {
+            clientConnectTime = millis();
             return;
         }
     }

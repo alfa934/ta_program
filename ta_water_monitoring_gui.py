@@ -94,29 +94,33 @@ class WaterQualityApp:
             # Send data
             sock.sendall(data)
             
-            # Create file-like object for reading lines
-            sock_file = sock.makefile('r')
-            
-            # Read response line by line
-            response_lines = []
-            finished = False
-            
-            while not finished:
-                line = sock_file.readline().strip()
-                if not line:
-                    break
+            # Only wait for response if saving data
+            if save:
+                # Create file-like object for reading lines
+                sock_file = sock.makefile('r')
                 
-                # Check if this is the last line
-                if ';' in line:
-                    tokens = line.split(';')
-                    # Last token is the sd_card_finished flag
-                    if tokens and tokens[-1] == '1':
-                        finished = True
+                # Read response line by line
+                response_lines = []
+                finished = False
                 
-                response_lines.append(line)
-            
-            sock_file.close()
-            return response_lines
+                while not finished:
+                    line = sock_file.readline().strip()
+                    if not line:
+                        break
+                    
+                    # Check if this is the last line
+                    if ';' in line:
+                        tokens = line.split(';')
+                        # Last token is the sd_card_finished flag
+                        if tokens and tokens[-1] == '1':
+                            finished = True
+                    
+                    response_lines.append(line)
+                
+                sock_file.close()
+                return response_lines
+            else:
+                return ["Perintah berhasil dikirim"]
             
         except socket.timeout:
             return "Error: ESP32 response timeout"
@@ -195,25 +199,31 @@ class WaterQualityApp:
                 # Handle network errors
                 self.test_completed = False
                 self.response_text = response
-                # Update response in ResultsPage
-                self.root.after(0, lambda: self.pages["ResultsPage"].update_response(response))
+                # Update response in InputPage
+                self.root.after(0, lambda: self.pages["InputPage"].update_response(response))
             else:
                 try:
-                    # Parse string data
-                    self.parse_response_data(response)
-                    self.test_completed = True
-                    # Update response with success message
-                    success_msg = f"Berhasil menerima {len(self.parsed_data)} data"
-                    self.root.after(0, lambda: self.pages["ResultsPage"].update_response(success_msg))
+                    # Only parse if we're saving data
+                    if save:
+                        self.parse_response_data(response)
+                        self.test_completed = True
+                        # Switch to results page
+                        self.root.after(0, lambda: self.show_page("ResultsPage"))
+                        # Update response with success message
+                        success_msg = f"Berhasil menerima {len(self.parsed_data)} data"
+                        self.root.after(0, lambda: self.pages["ResultsPage"].update_response(success_msg))
+                    else:
+                        # For send-only command, show success on InputPage
+                        self.root.after(0, lambda: self.pages["InputPage"].update_response("Perintah berhasil dikirim"))
                 except Exception as e:
                     self.test_completed = False
                     error_msg = f"Data parsing error: {str(e)}"
                     self.response_text = error_msg
-                    self.root.after(0, lambda: self.pages["ResultsPage"].update_response(error_msg))
+                    if save:
+                        self.root.after(0, lambda: self.pages["ResultsPage"].update_response(error_msg))
+                    else:
+                        self.root.after(0, lambda: self.pages["InputPage"].update_response(error_msg))
             
-            # Switch to results page
-            self.root.after(0, lambda: self.show_page("ResultsPage"))
-        
         threading.Thread(target=communication_thread, daemon=True).start()
     
     def get_last_valid_reading(self, save_key, value_key, interval_key):
