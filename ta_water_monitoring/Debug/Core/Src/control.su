@@ -9,5 +9,5 @@
 ../Core/Src/control.c:188:6:Task_Pressure	8	static
 ../Core/Src/control.c:209:6:Task_Control_Test_UpDown	8	static
 ../Core/Src/control.c:272:6:Task_Control_PID	16	static
-../Core/Src/control.c:374:6:light_sequence	8	static
-../Core/Src/control.c:420:6:my_my_task	8	static
+../Core/Src/control.c:377:6:light_sequence	8	static
+../Core/Src/control.c:423:6:my_my_task	8	static

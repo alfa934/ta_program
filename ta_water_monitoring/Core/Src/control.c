@@ -325,11 +325,14 @@ void Task_Control_PID()
 
 				if(delay_10ms >= 4)
 				{
-					pressure_pid.setpoint = depth_setpoint;
-					pressure_pid.kp = 400;
-					pressure_pid.ki = 0;
-					pressure_pid.kd = 0;
-					motor_pid.setpoint = PID_Update(&pressure_pid, pressure_pid.setpoint, MS5837.pressure_mbar, FULL_LENGTH_PULSE - 100);
+//					pressure_pid.setpoint = depth_setpoint;
+//					pressure_pid.kp = 400;
+//					pressure_pid.ki = 0;
+//					pressure_pid.kd = 0;
+//					motor_pid.setpoint = PID_Update(&pressure_pid, pressure_pid.setpoint, MS5837.pressure_mbar, FULL_LENGTH_PULSE - 100);
+
+					motor_pid.setpoint = depth_setpoint;
+
 					delay_10ms = 0;
 
 				}

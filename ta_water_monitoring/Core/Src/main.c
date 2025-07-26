@@ -143,15 +143,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		{
 			adaptive_start = 0;
 			done_state = 1;
-			pid_task.state++;
+			pid_task.state = 3;
 		}
 
-//		get_data_cnt++;
-//		if(get_data_cnt >= 50)
-//		{
-//			HAL_UART_Transmit_DMA(&huart2, (uint8_t *)tx, sizeof(tx));
-//			get_data_cnt = 0;
-//		}
 
 		if(send_ph)
 		{
