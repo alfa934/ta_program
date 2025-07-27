@@ -173,28 +173,15 @@ void handleServer()
 {
     if (wifiState != CONNECTED) return;
 
-    if (currentClient && !currentClient.connected())
-    {
-        currentClient.stop();
-        send_to_user = 0;  // Reset the send flag
-        sd_card_finished = 0;
-        currentClient = WiFiClient();  // Clear client instance
-    }
-    
     if (!currentClient)
     {
         currentClient = server.available();
-        if (currentClient)
-        {
-            clientConnectTime = millis();
-            return;
-        }
     }
-    
-    if (!currentClient.connected())
+
+    if (currentClient && !currentClient.connected())
     {
         currentClient.stop();
-        return;
+        currentClient = WiFiClient(); 
     }
     
     if (currentClient.available() >= sizeof(rx_user_buffer))
@@ -226,14 +213,12 @@ void handleServer()
 
 void handleTest()
 {
-  if (!currentClient.connected())
-  {
-    return;
-  }
-
   if(new_sensor_data_NANO)
   {
-    currentClient.write(tx_str.c_str(), tx_str.length());
+    if (currentClient && currentClient.connected())
+    {
+        currentClient.write(tx_str.c_str(), tx_str.length());
+    }
     new_sensor_data_NANO = false;
   }
 
