@@ -18,7 +18,7 @@
 // DO
 #define VREF 	3300
 #define ADC_RES 4095
-#define CAL1_V 	800
+#define CAL1_V 	400
 #define CAL1_T 	23
 // Turbidity
 #define HISTORY_SIZE 	10

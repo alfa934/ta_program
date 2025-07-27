@@ -128,7 +128,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 		if((depth_setpoint != -1) && (duration_min != 0))
 		{
-			pid_task.start = 1;
+			pid_task.start = 1; //---set this to 1
 		}
 
 		Task_Control_PID();
@@ -363,7 +363,7 @@ int main(void)
 
   HAL_TIM_Base_Start_IT(&htim3);
 #endif
-
+//--- turn this ON
   HAL_UART_Receive_DMA(&huart1, (uint8_t*)UART1_RX_BUFFER, sizeof(UART1_RX_BUFFER));
 
   HAL_TIM_Base_Start_IT(&htim4);
