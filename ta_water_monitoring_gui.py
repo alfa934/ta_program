@@ -176,56 +176,53 @@ class WaterQualityApp:
             except (ValueError, TypeError, IndexError) as e:
                 print(f"Error parsing line: {line}\nError: {str(e)}")
     
+    # --- FINAL CORRECTED FUNCTION ---
     def start_test(self, depth, duration, save):
         # Validate inputs
         try:
-            depth_val = int(depth)
-            duration_val = int(duration)
-            
-        except:
+            int(depth)
+            int(duration)
+        except ValueError:
             self.pages["InputPage"].update_response("Error: Masukkan angka yang valid")
             return
         
-        # Show sending message
-        self.pages["InputPage"].update_response("Mengirim ke ESP32...")
+        # If we are fetching data, immediately switch to the results page to show progress.
+        if save:
+            self.show_page("ResultsPage")
+            self.pages["ResultsPage"].update_response("Mengambil data dari ESP32...")
+        else:
+            self.pages["InputPage"].update_response("Mengirim perintah ke ESP32...")
+        
         self.test_completed = False
         
-        # Send in separate thread
         def communication_thread():
             response = self.send_to_esp32(depth, duration, save)
-            self.response_text = response
             
-            if isinstance(response, str) and response.startswith("Error:"):
-                # Handle network errors
-                self.test_completed = False
-                self.response_text = response
-                # Update response in InputPage
-                self.root.after(0, lambda: self.pages["InputPage"].update_response(response))
-            else:
-                try:
-                    # Only parse if we're saving data
+            def update_gui():
+                # If there was a network error
+                if isinstance(response, str) and response.startswith("Error:"):
+                    # Show error on the relevant page
                     if save:
-                        self.parse_response_data(response)
-                        self.test_completed = True
-                        # Switch to results page
-                        self.root.after(0, lambda: self.show_page("ResultsPage"))
-                        # Update response with success message
-                        success_msg = f"Berhasil menerima {len(self.parsed_data)} data"
-                        self.root.after(0, lambda: self.pages["ResultsPage"].update_response(success_msg))
+                        self.pages["ResultsPage"].update_response(response)
                     else:
-                        # For send-only command, show success on InputPage
-                        self.root.after(0, lambda: self.pages["InputPage"].update_response("Perintah berhasil dikirim"))
-                except Exception as e:
-                    self.test_completed = False
-                    error_msg = f"Data parsing error: {str(e)}"
-                    self.response_text = error_msg
-                    if save:
-                        self.root.after(0, lambda: self.pages["ResultsPage"].update_response(error_msg))
-                    else:
-                        self.root.after(0, lambda: self.pages["InputPage"].update_response(error_msg))
+                        self.pages["InputPage"].update_response(response)
+                # If the action was to fetch data (Ambil Data)
+                elif save:
+                    self.parse_response_data(response)
+                    self.test_completed = True
+                    # The page is already visible, now we update it with the final data
+                    self.pages["ResultsPage"].update_display()
+                    success_msg = f"Berhasil menerima {len(self.parsed_data)} data"
+                    self.pages["ResultsPage"].update_response(success_msg)
+                # If the action was just to send the command (Kirim)
+                else:
+                    self.pages["InputPage"].update_response(response[0] if response else "Perintah berhasil dikirim")
+
+            # Schedule the GUI update to run on the main thread
+            self.root.after(0, update_gui)
             
         threading.Thread(target=communication_thread, daemon=True).start()
-    
+
     def get_last_valid_reading(self, save_key, value_key, interval_key):
         """Find the last valid reading for a specific parameter"""
         for data in reversed(self.parsed_data):
