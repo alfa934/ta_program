@@ -188,7 +188,7 @@ void receiveData()
 // This function is memory-safe.
 void writeFiles()
 {
-    openFile = SD.open("stfu.txt", FILE_WRITE);
+    openFile = SD.open("jasuci.txt", FILE_WRITE);
 
     if(openFile)
     {   
@@ -237,7 +237,7 @@ void writeFiles()
 // It sends the raw text data from the SD card, which the ESP32 is expecting.
 void transmitFile()
 {
-  openFile = SD.open("STFU.txt");
+  openFile = SD.open("jasuci.txt");
   if (openFile)
   {
     // This protocol sends the raw text data for maximum reliability
